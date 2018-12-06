@@ -1,0 +1,260 @@
+﻿@model dynamic
+
+<!DOCTYPE html>
+
+<html>
+<head>
+    <title>连通性</title>
+</head>
+<body>
+    <div>
+        <div>通讯测试成功，调用上传文件方法：</div>
+        <div>1、进行文件分片上传</div>
+        <pre>WebRequestHelper.UploadFileToServer("http://127.0.0.1:8050/HandlerFile/HandlerFile.ashx","E:\\Common.UploadService\\Common.UploadService\\Uploadfile\\intellij_idea_hhb.xp510.com.rar", "test.rar");</pre>
+        <div>
+            2、单个文件上传
+        </div>
+        <pre>WebRequestHelper.PostFileAndValue("http://127.0.0.1:8050/HandlerFile/HandlerFile.ashx?fun=001","E:\\Common.UploadService\\Common.UploadService\\Uploadfile\\MLY-zh-cn.pdf", "upfile.pdf", "", "");</pre>
+        <div>调用的方法定义：</div>
+        <pre>
+        /// &lt;summary>
+        /// 将本地文件上传到指定的地址(HttpWebRequest方法)
+        /// &lt;/summary>
+        /// &lt;param name="address">文件上传到的服务器&lt;/param>
+        /// &lt;param name="fileNamePath">要上传的本地文件（全路径）&lt;/param>
+        /// &lt;param name="saveName">文件上传后的名称&lt;/param>
+        /// &lt;param name="attachName">附加值名称&lt;/param>
+        /// &lt;param name="attachValue">附加值的值&lt;/param>
+        /// &lt;returns>成功返回1，失败返回0&lt;/returns>
+        public static string PostFileAndValue(string address, string fileNamePath, string saveName, string attachName, string attachValue)
+        {
+            if (string.IsNullOrEmpty(address)) return null;
+            if (!File.Exists(fileNamePath))
+            {
+                return null;
+            }
+            // 要上传的文件
+            FileStream fs = new FileStream(fileNamePath, FileMode.Open, FileAccess.Read);
+            long size = fs.Length;
+            byte[] array = new byte[size];
+            fs.Read(array, 0, array.Length);
+            fs.Close();
+            var filelist = new List&lt;UploadFile>
+            {
+                new UploadFile
+                {
+                    Data = array,
+                    Filename = saveName,
+                    Name = "upfile"
+                }
+            };
+            NameValueCollection valuesCollection = new NameValueCollection
+            {
+                {attachName, attachValue}
+            };
+            var result = PostFileAndValue(address, filelist, valuesCollection);
+            return result;
+        }
+
+        /// &lt;summary>
+        /// 以Post 形式提交数据到 uri，一次提交全部数据
+        /// &lt;/summary>  
+        /// &lt;param name="uri">请求地址&lt;/param>
+        /// &lt;param name="files">文件列表&lt;/param>
+        /// &lt;param name="values">附加值&lt;/param>
+        /// &lt;returns>&lt;/returns>
+        public static string PostFileAndValue(string uri, IEnumerable&lt;UploadFile> files, NameValueCollection values)
+        {
+            string boundary = "----------------------------" + DateTime.Now.Ticks.ToString("x");
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(uri);
+            request.ContentType = "multipart/form-data; boundary=" + boundary;
+            request.Method = "POST";
+            request.KeepAlive = true;
+            request.Credentials = CredentialCache.DefaultCredentials;
+
+            MemoryStream stream = new MemoryStream();
+            byte[] line = Encoding.ASCII.GetBytes("\r\n--" + boundary + "\r\n");
+            //提交文本字段  
+            if (values != null)
+            {
+                string format = "\r\n--" + boundary + "\r\nContent-Disposition: form-data; name=\"{0}\";\r\n\r\n{1}";
+                foreach (string key in values.Keys)
+                {
+                    string s = string.Format(format, key, values[key]);
+                    byte[] data = Encoding.UTF8.GetBytes(s);
+                    stream.Write(data, 0, data.Length);
+                }
+                stream.Write(line, 0, line.Length);
+            }
+            //提交文件
+            var uploadFiles = files as IList&lt;UploadFile> ?? files.ToList();
+            if (uploadFiles.Any())
+            {
+                string fformat = "Content-Disposition: form-data; name=\"{0}\"; filename=\"{1}\"\r\n Content-Type: application/octet-stream\r\n\r\n";
+                foreach (UploadFile file in uploadFiles)
+                {
+                    string s = string.Format(fformat, file.Name, file.Filename);
+                    byte[] data = Encoding.UTF8.GetBytes(s);
+                    stream.Write(data, 0, data.Length);
+                    stream.Write(file.Data, 0, file.Data.Length);
+                    stream.Write(line, 0, line.Length);
+                }
+            }
+            request.ContentLength = stream.Length;
+            request.Timeout = 1000 * 60 * 10;
+            Stream requestStream = request.GetRequestStream();
+            stream.Position = 0L;
+            stream.CopyTo(requestStream);
+            stream.Close();
+            requestStream.Close();
+            using (var response = request.GetResponse())
+            {
+                using (var responseStream = response.GetResponseStream())
+                {
+                    if (responseStream == null) return null;
+                    //读取服务器端返回的消息
+                    StreamReader sr = new StreamReader(responseStream);
+                    String sReturnString = sr.ReadLine();
+                    return sReturnString;
+                }
+            }
+        }
+
+        /// &lt;summary>
+        /// 文件分片上传文件
+        /// &lt;/summary>
+        /// &lt;param name="uploadHost">接口地址&lt;/param>
+        /// &lt;param name="filePath">文件全路径&lt;/param>
+        /// &lt;param name="fileName">文件名称&lt;/param>
+        /// &lt;returns>&lt;/returns>
+        public static UploadResult UploadFileToServer(string uploadHost, string filePath, string fileName)
+        {
+            var resultModel = new UploadResult { State = UploadState.Unknown };
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                return resultModel;
+            }
+            if (string.IsNullOrEmpty(uploadHost))
+            {
+                return resultModel;
+            }
+            var fileGuId = Guid.NewGuid().ToString();
+            if (string.IsNullOrEmpty(fileName))
+            {
+                fileName = Path.GetFileName(filePath);
+            }
+
+            // 要上传的文件
+            FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            //每次读取4M字节大小的数据
+            var fileBuffer = new byte[1024 * 1024 * 4];
+            long totalLength = fs.Length;
+            var sendTime = totalLength / fileBuffer.Length + (totalLength % fileBuffer.Length > 0 ? 1 : 0);
+            var partIndex = 0;
+            while (totalLength > 0)
+            {
+                partIndex++;
+                var length = fs.Read(fileBuffer, 0, fileBuffer.Length);
+                totalLength = totalLength - length;
+                NameValueCollection valuesCollection = new NameValueCollection
+                {
+                    {"fun", "003"},
+                    {"guId", fileGuId},
+                    {"partCount", sendTime.ToString()},
+                    {"partIndex", partIndex.ToString()},
+                    {"fileName", fileName}
+                };
+
+                string boundary = "----------------------------" + DateTime.Now.Ticks.ToString("x");
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(uploadHost);
+                request.ContentType = "multipart/form-data; boundary=" + boundary;
+                request.Method = "POST";
+                request.KeepAlive = true;
+                request.Credentials = CredentialCache.DefaultCredentials;
+
+                Stream requestStream = request.GetRequestStream();
+
+                //MemoryStream stream = new MemoryStream();
+                byte[] line = Encoding.ASCII.GetBytes("\r\n--" + boundary + "\r\n");
+
+                //提交文本字段
+                string format = "\r\n--" + boundary + "\r\nContent-Disposition: form-data; name=\"{0}\";\r\n\r\n{1}";
+                foreach (string key in valuesCollection.Keys)
+                {
+                    string s = string.Format(format, key, valuesCollection[key]);
+                    byte[] data = Encoding.UTF8.GetBytes(s);
+                    requestStream.Write(data, 0, data.Length);
+                }
+                requestStream.Write(line, 0, line.Length);
+
+                //写文件信息
+                string fformat = "Content-Disposition: form-data; name=\"{0}\"; filename=\"{1}\"\r\n Content-Type: application/octet-stream\r\n\r\n";
+                string fileInfo = string.Format(fformat, fileName, fileName);
+                byte[] fileNameData = Encoding.UTF8.GetBytes(fileInfo);
+                requestStream.Write(fileNameData, 0, fileNameData.Length);
+
+                //数据传输
+                requestStream.Write(fileBuffer, 0, length);
+                requestStream.Write(line, 0, line.Length);
+
+                request.Timeout = 1000 * 60 * 100;
+                requestStream.Close();
+                try
+                {
+                    using (var response = request.GetResponse())
+                    {
+                        using (var responseStream = response.GetResponseStream())
+                        {
+                            if (responseStream == null) return null;
+                            //读取服务器端返回的消息
+                            StreamReader sr = new StreamReader(responseStream);
+                            string sReturnString = sr.ReadLine();
+                            if (string.IsNullOrEmpty(sReturnString))
+                            {
+                                resultModel.State = UploadState.NetworkError;
+                                resultModel.ErrorMessage = "服务器返回为空";
+                            }
+                            else
+                            {
+                                resultModel = JsonConvert.DeserializeObject&lt;UploadResult>(sReturnString);
+                            }
+                            if (resultModel.State != UploadState.Success)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    resultModel.State = UploadState.Unknown;
+                    resultModel.ErrorMessage = e.Message;
+                    break;
+                }
+            }
+            fs.Close();
+
+            if (resultModel.State != UploadState.Success)
+            {
+                return resultModel;
+            }
+
+            uploadHost += $"?fun=004&guId={fileGuId}&partCount={sendTime}&fileName={fileName}";
+
+            UploadResult httpResultModel = new UploadResult();
+            try
+            {
+                var finishStr = HttpGet(uploadHost);
+                httpResultModel = JsonConvert.DeserializeObject&lt;UploadResult>(finishStr);
+            }
+            catch (Exception e)
+            {
+                httpResultModel.ErrorMessage = e.Message;
+            }
+            resultModel = httpResultModel;
+            return resultModel;
+        }
+</pre>
+    </div>
+</body>
+</html>
