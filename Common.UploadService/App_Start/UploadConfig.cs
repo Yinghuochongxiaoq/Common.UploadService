@@ -41,6 +41,11 @@ namespace Common.UploadService
         public string PreUrl { get; set; }
 
         /// <summary>
+        /// 其他附加信息
+        /// </summary>
+        public string Others { get; set; }
+
+        /// <summary>
         /// 检测文件类型
         /// </summary>
         /// <param name="filename"></param>

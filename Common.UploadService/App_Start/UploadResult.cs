@@ -29,6 +29,10 @@
         /// 或者状态信息
         /// </summary>
         public string StateStr => GetStateMessage(State);
+        /// <summary>
+        /// 其他信息
+        /// </summary>
+        public string Others { get; set; }
 
         /// <summary>
         /// 获取消息

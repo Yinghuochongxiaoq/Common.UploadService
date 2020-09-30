@@ -25,8 +25,9 @@
     ".pdf",
     ".txt",
     ".md",
-    ".xml"
+    ".xml",
+    ".mp4"
   ], /* 上传图片格式显示 */
-  "imageUrlPrefix": "http://localhost:4719", /* 图片访问路径前缀 */
+  "imageUrlPrefix": "http://localhost:8001", /* 图片访问路径前缀 */
   "imagePathFormat": "/Uploadfile/{yyyy}{mm}{dd}/{time}{rand:6}" /* 上传保存路径,可以自定义保存路径和文件名格式 */
 }

@@ -32,7 +32,8 @@ namespace Common.UploadService.HandlerFile
                         PathFormat = Config.GetString("imagePathFormat"),
                         SizeLimit = Config.GetInt("imageMaxSize"),
                         UploadFieldName = Config.GetString("imageFieldName"),
-                        PreUrl = Config.GetString("imageUrlPrefix")
+                        PreUrl = Config.GetString("imageUrlPrefix"),
+                        Others = context.GetStringFromParameters("others")
                     });
                     break;
                 //获取文件记录

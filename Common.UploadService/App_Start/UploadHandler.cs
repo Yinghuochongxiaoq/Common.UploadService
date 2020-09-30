@@ -17,7 +17,7 @@ namespace Common.UploadService
         public UploadHandler(HttpContext context, UploadConfig config) : base(context)
         {
             UploadConfig = config;
-            Result = new UploadResult { State = UploadState.Unknown };
+            Result = new UploadResult { State = UploadState.Unknown, Others = config.Others };
         }
 
         /// <summary>
