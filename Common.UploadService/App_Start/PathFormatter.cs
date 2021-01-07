@@ -30,7 +30,7 @@ namespace Common.UploadService
                 {
                     digit = Convert.ToInt32(match.Groups[2].Value);
                 }
-                var rand = new Random();
+                var rand = new Random(DateTime.Now.Millisecond);
                 return rand.Next((int)Math.Pow(10, digit), (int)Math.Pow(10, digit + 1)).ToString();
             });
 
